@@ -150,21 +150,31 @@ let multipart = multer({dest: `${__dirname}/tmp/uploads`})
 app.post('/upload', multipart.single("image"), async(req, res) => {
 
 	const rb = req.body
-	try{
-		const buffer = await readFile(req.file.path);
-		const result = await putImage(req.file, buffer);
-		const mongResult = await mongoClient.db(MONGO_DB).collection(MONGO_COL).insertOne({
-			title: rb.title,
-			comments: rb.comments,
-			upload_time: new Timestamp(),
-			image: `https://chins.fra1.digitaloceanspaces.com/${req.file.filename}`
-		})
-		fs.unlink(req.file.path, ()=>{});
-		res.status(200).type('application/json').json({"message":"Upload successful"})
-
+	const conn = await pool.getConnection();
+	const [result,_] = await conn.query(SQL_AUTH_USER, [rb.user_id, rb.password])
+	if(result[0].count == 0){
+		res.status(401).type('application/json').json({"message": "Authentication failed."})
 	}
-	catch(e) {
-		res.status(500).type('application/json').json({e})
+	else{
+
+		try{
+			const buffer = await readFile(req.file.path);
+			const result = await putImage(req.file, buffer);
+			const mongoResult = await mongoClient.db(MONGO_DB).collection(MONGO_COL).insertOne({
+				title: rb.title,
+				comments: rb.comments,
+				upload_time: new Timestamp(),
+				image: `https://chins.fra1.digitaloceanspaces.com/${req.file.filename}`
+			})
+			fs.unlink(req.file.path, ()=>{});
+			res.status(200).type('application/json').json({"message":"Upload successful", id: mongoResult.insertedId})
+	
+		}
+		catch(e) {
+			res.status(500).type('application/json').json({e})
+		}
+
+
 	}
 
 })

@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { AuthService } from '../auth.service';
 import {CameraService} from '../camera.service';
 import { ShareService } from '../sharedata.service';
@@ -15,7 +16,7 @@ export class MainComponent implements OnInit {
 	shareForm: FormGroup
 	img
 
-	constructor(private cameraSvc: CameraService, private fb: FormBuilder, private shareSvc: ShareService, private authSvc: AuthService) { }
+	constructor(private cameraSvc: CameraService, private fb: FormBuilder, private shareSvc: ShareService, private authSvc: AuthService, private router: Router) { }
 
 	ngOnInit(): void {
 
@@ -47,14 +48,19 @@ export class MainComponent implements OnInit {
     	formData.set('title', values.title);
 		formData.set('comments',values.comments);
 		formData.set('image', this.img.imageData);
-		formData.set('user_id', credentials.user_id);
+		formData.set('user_id', credentials.user_id);  //credentials.user_id
 		formData.set('password', credentials.password)
 		try{
 			const response = await this.shareSvc.share(formData);
-			console.log(response)
+			console.log(response);
+			this.shareForm.reset();
+			this.clear();
 		}
 		catch(e){
-			console.log(e)
+			console.log(e.status)
+			if(e.status == 401){
+				this.router.navigate(['/'])
+			}
 		}
 
 	}
