@@ -1,6 +1,5 @@
-import { ChangeDetectorRef, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
 import { AuthService } from '../auth.service';
 import {CameraService} from '../camera.service';
 import { ShareService } from '../sharedata.service';
@@ -43,7 +42,6 @@ export class MainComponent implements OnInit {
 
 	async share() {
 		const values = this.shareForm.value
-		console.log(values)
 		const credentials = this.authSvc.getCredentials()
 		const formData = new FormData();
     	formData.set('title', values.title);
@@ -51,7 +49,6 @@ export class MainComponent implements OnInit {
 		formData.set('image', this.img.imageData);
 		formData.set('user_id', credentials.user_id);
 		formData.set('password', credentials.password)
-		console.log(formData.get('image'))
 		try{
 			const response = await this.shareSvc.share(formData);
 			console.log(response)

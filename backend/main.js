@@ -6,6 +6,7 @@ const AWS = require('aws-sdk');
 const fs = require('fs');
 const mysql2 = require('mysql2/promise');
 const cors = require('cors');
+const { MongoClient, Timestamp } = require('mongodb');
 
 //AWS configuration
 const endpoint = new AWS.Endpoint('fra1.digitaloceanspaces.com');
@@ -14,6 +15,12 @@ const s3 = new AWS.S3({
     accessKeyId: process.env.S3_ACCESS_KEY,
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
 })
+
+//Configure MongoDb 
+const MONGO_URL = "mongodb://localhost:27017";
+const mongoClient = new MongoClient(MONGO_URL, {useNewUrlParser: true, useUnifiedTopology: true})
+const MONGO_DB = 'tots';
+const MONGO_COL = 'tots';
 
 //MySQL configuration
 const pool = mysql2.createPool({
@@ -92,8 +99,9 @@ const p0 = new Promise((resolve,reject) => {
 })
 
 const p1 = pool.getConnection();
+const p2 = mongoClient.connect();
 
-Promise.all([p0,p1]).then(async result => {
+Promise.all([p0,p1,p2]).then(async result => {
 
     const conn = result[1];
     await conn.ping();
@@ -108,11 +116,13 @@ Promise.all([p0,p1]).then(async result => {
 app.use(express.urlencoded({extended:true}));
 app.use(cors())
 
+//Starting route
+app.use('/', express.static(__dirname+'/public/dist/frontend'))
+
 //Login route 
 app.post('/login', async(req, res) => {
 
     const rb = req.body;
-    console.log(rb)
     const conn = await pool.getConnection();
     try{
 		const [result,_] = await conn.query(SQL_AUTH_USER, [rb.user_id, rb.password])
@@ -139,9 +149,22 @@ app.post('/login', async(req, res) => {
 let multipart = multer({dest: `${__dirname}/tmp/uploads`})
 app.post('/upload', multipart.single("image"), async(req, res) => {
 
-	console.log(req.file);
-	console.log(req.body)
-	res.status(200).type('application/json').json({"message": "received on backend"})
+	const rb = req.body
+	try{
+		const buffer = await readFile(req.file.path);
+		const result = await putImage(req.file, buffer);
+		const mongResult = await mongoClient.db(MONGO_DB).collection(MONGO_COL).insertOne({
+			title: rb.title,
+			comments: rb.comments,
+			upload_time: new Timestamp(),
+			image: `https://chins.fra1.digitaloceanspaces.com/${req.file.filename}`
+		})
+		fs.unlink(req.file.path, ()=>{});
+		res.status(200).type('application/json').json({"message":"Upload successful"})
 
+	}
+	catch(e) {
+		res.status(500).type('application/json').json({e})
+	}
 
 })
